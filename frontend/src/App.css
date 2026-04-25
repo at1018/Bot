@@ -1,0 +1,59 @@
+.app {
+  display: flex;
+  height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.error-banner {
+  background: #ffe0e0;
+  color: #d32f2f;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ffcdd2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .chat-container {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .sidebar-toggle {
+    display: flex;
+  }
+}

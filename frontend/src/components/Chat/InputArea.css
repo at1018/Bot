@@ -1,0 +1,160 @@
+.input-area {
+  background: white;
+  padding: 16px;
+  border-top: 1px solid #e9ecef;
+  border-radius: 0 0 8px 8px;
+}
+
+.context-input-wrapper {
+  margin-bottom: 12px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+  }
+  to {
+    opacity: 1;
+    max-height: 40px;
+  }
+}
+
+.context-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #f8f9fa;
+  transition: all 0.3s ease;
+}
+
+.context-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.context-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.message-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #f8f9fa;
+  transition: all 0.3s ease;
+  resize: none;
+}
+
+.message-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.message-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.send-btn,
+.context-toggle-btn,
+.new-session-btn {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #667eea;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #764ba2;
+  transform: scale(1.05);
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.context-toggle-btn {
+  background: #f1f3f5;
+  color: #495057;
+  padding: 10px 12px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.context-toggle-btn:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+.context-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.new-session-btn {
+  background: #48bb78;
+}
+
+.new-session-btn:hover:not(:disabled) {
+  background: #38a169;
+}
+
+.new-session-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-hint {
+  font-size: 11px;
+  color: #adb5bd;
+  margin-top: 8px;
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .input-area {
+    padding: 12px;
+  }
+
+  .input-wrapper {
+    gap: 6px;
+  }
+
+  .message-input {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .send-btn,
+  .new-session-btn,
+  .context-toggle-btn {
+    padding: 8px 10px;
+  }
+}
