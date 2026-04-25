@@ -16,7 +16,8 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting Chatbot API")
-    logger.info(f"Using model: {settings.model_name}")
+    logger.info(f"Using provider: {settings.llm_provider}")
+    logger.info(f"Extraction level: {settings.extraction_level}")
     yield
     # Shutdown
     logger.info("Shutting down Chatbot API")

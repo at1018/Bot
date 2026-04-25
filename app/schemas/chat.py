@@ -81,3 +81,30 @@ class ClearHistoryResponse(BaseModel):
     session_id: str
     status: str
     message: str
+
+
+class ExtractionLevelRequest(BaseModel):
+    """Request model for setting extraction level."""
+    level: int = Field(..., ge=1, le=3, description="Extraction level: 1=minimal, 2=medium, 3=detailed")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "level": 2
+            }
+        }
+
+
+class ExtractionLevelResponse(BaseModel):
+    """Response for extraction level operations."""
+    extraction_level: int
+    description: str
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "extraction_level": 2,
+                "description": "Medium extraction - include relevant context and examples"
+            }
+        }
+

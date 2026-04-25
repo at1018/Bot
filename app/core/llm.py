@@ -1,8 +1,6 @@
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
 from config.settings import settings
-from langchain_groq import ChatGroq
+from app.models import get_llm_provider
+from app.models.base import BaseLLMProvider
 from typing import Optional
 from app.utils.logger import get_logger
 
@@ -13,44 +11,16 @@ class ChatbotLLM:
     """LangChain-based LLM wrapper for chatbot functionality."""
     
     def __init__(self):
-        """Initialize the LLM with OpenAI configuration."""
-        # if not settings.openai_api_key:
-        #     raise ValueError("OPENAI_API_KEY environment variable not set")
-        if not settings.groq_api_key:
-            raise ValueError("GROQ_API_KEY environment variable not set")
-        self.llm = ChatGroq(
-            model_name=settings.model_name,
-            # temperature=settings.temperature,
-            # max_tokens=settings.max_tokens,
-            api_key=settings.groq_api_key
-        )
-        
-        # self.llm = ChatOpenAI(
-        #     model_name=settings.model_name,
-        #     temperature=settings.temperature,
-        #     max_tokens=settings.max_tokens,
-        #     api_key=settings.openai_api_key
-        # )
-        
-        # System prompt template with conversation history support
-        self.system_template = """You are a helpful and knowledgeable chatbot assistant. 
-Your role is to provide clear, accurate, and helpful answers to user questions.
-Always be respectful, professional, and concise in your responses.
-If you don't know something, acknowledge it and suggest how the user might find the answer.
-
-{conversation_context}
-
-{additional_context}"""
-        
-        self.prompt_template = ChatPromptTemplate.from_messages([
-            ("system", self.system_template),
-            ("human", "{question}")
-        ])
-        
-        self.chain = (
-            self.prompt_template 
-            | self.llm
-        )
+        """Initialize the LLM with configured provider."""
+        try:
+            self.provider: BaseLLMProvider = get_llm_provider()
+            logger.info(
+                f"ChatbotLLM initialized with provider: {settings.llm_provider}, "
+                f"extraction_level: {settings.extraction_level}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize ChatbotLLM: {str(e)}")
+            raise
     
     async def get_answer(
         self, 
@@ -59,7 +29,7 @@ If you don't know something, acknowledge it and suggest how the user might find 
         conversation_history: Optional[str] = None
     ) -> tuple[str, bool]:
         """
-        Get an answer to a question using LangChain with conversation history.
+        Get an answer to a question using configured LLM provider.
         
         Args:
             question: The user's question
@@ -84,20 +54,14 @@ Based on the conversation history above, please provide a contextual answer."""
             # Prepare additional context
             additional_context = f"User Context: {context}" if context else ""
             
-            logger.debug(f"Invoking LLM with history_used={history_was_used}")
+            logger.debug(f"Invoking LLM with provider={settings.llm_provider}, history_used={history_was_used}")
             
-            # Invoke the chain with context
-            response = self.chain.invoke({
-                "question": question,
-                "conversation_context": conversation_context,
-                "additional_context": additional_context
-            })
-            
-            # Extract content from the response
-            if hasattr(response, 'content'):
-                answer = response.content
-            else:
-                answer = str(response)
+            # Invoke the provider
+            answer = self.provider.invoke(
+                question=question,
+                conversation_context=conversation_context,
+                additional_context=additional_context
+            )
             
             return answer, history_was_used
             
@@ -108,10 +72,25 @@ Based on the conversation history above, please provide a contextual answer."""
     def get_model_info(self) -> dict:
         """Get information about the current model."""
         return {
-            "model": settings.model_name,
+            "provider": settings.llm_provider,
+            "model": self.provider.model_name,
             "temperature": settings.temperature,
-            "max_tokens": settings.max_tokens
+            "max_tokens": settings.max_tokens,
+            "extraction_level": self.provider.get_extraction_level()
         }
+    
+    def set_extraction_level(self, level: int) -> None:
+        """Set the extraction level for the provider."""
+        try:
+            self.provider.set_extraction_level(level)
+            logger.info(f"Extraction level set to: {level}")
+        except ValueError as e:
+            logger.error(f"Invalid extraction level: {str(e)}")
+            raise
+    
+    def get_extraction_level(self) -> int:
+        """Get the current extraction level."""
+        return self.provider.get_extraction_level()
 
 
 # Global LLM instance

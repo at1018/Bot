@@ -9,7 +9,9 @@ from app.schemas.chat import (
     ChatMessage,
     SessionInfo,
     ClearHistoryRequest,
-    ClearHistoryResponse
+    ClearHistoryResponse,
+    ExtractionLevelRequest,
+    ExtractionLevelResponse
 )
 from app.core.llm import get_llm
 from app.core.memory import get_memory
@@ -314,4 +316,78 @@ async def list_all_sessions():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error listing sessions"
+        )
+
+
+@router.get("/extraction-level", response_model=ExtractionLevelResponse, status_code=status.HTTP_200_OK)
+async def get_extraction_level() -> ExtractionLevelResponse:
+    """
+    Get the current extraction level for the LLM.
+    
+    Returns:
+        ExtractionLevelResponse with current extraction level and description
+    """
+    try:
+        llm = get_llm()
+        level = llm.get_extraction_level()
+        
+        descriptions = {
+            1: "Minimal extraction - provide concise, direct answers",
+            2: "Medium extraction - include relevant context and examples",
+            3: "Detailed extraction - provide comprehensive information with deep analysis"
+        }
+        
+        logger.info(f"Extraction level requested: {level}")
+        
+        return ExtractionLevelResponse(
+            extraction_level=level,
+            description=descriptions.get(level, "Unknown")
+        )
+    except Exception as e:
+        logger.error(f"Error fetching extraction level: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error fetching extraction level"
+        )
+
+
+@router.put("/extraction-level", response_model=ExtractionLevelResponse, status_code=status.HTTP_200_OK)
+async def set_extraction_level(request: ExtractionLevelRequest) -> ExtractionLevelResponse:
+    """
+    Set the extraction level for the LLM.
+    Controls the depth of data extraction in responses.
+    
+    Args:
+        request: ExtractionLevelRequest with level (1-3)
+        
+    Returns:
+        ExtractionLevelResponse with updated extraction level
+    """
+    try:
+        llm = get_llm()
+        llm.set_extraction_level(request.level)
+        
+        descriptions = {
+            1: "Minimal extraction - provide concise, direct answers",
+            2: "Medium extraction - include relevant context and examples",
+            3: "Detailed extraction - provide comprehensive information with deep analysis"
+        }
+        
+        logger.info(f"Extraction level set to: {request.level}")
+        
+        return ExtractionLevelResponse(
+            extraction_level=request.level,
+            description=descriptions.get(request.level, "Unknown")
+        )
+    except ValueError as e:
+        logger.error(f"Invalid extraction level: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid extraction level: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error setting extraction level: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error setting extraction level"
         )
