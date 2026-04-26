@@ -56,8 +56,11 @@ class GeminiProvider(BaseLLMProvider):
                 "conversation_context": conversation_context,
                 "additional_context": additional_context,
             })
-            # Format response to ensure proper code formatting
-            return self._format_code_response(response.content)
+            print("Raw Response from Gemini:", response.content)  # Debugging line
+            # Format response to ensure proper code formatting 
+            formatted= self._format_code_response(response.content)
+            print("Formatted Response:", formatted)  # Debugging line
+            return formatted
         except Exception as e:
             logger.error(f"Error invoking Gemini: {str(e)}")
             raise

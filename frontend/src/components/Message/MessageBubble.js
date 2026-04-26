@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { ChatMessage } from './ChatMessage';
 import './MessageBubble.css';
 
 export const MessageBubble = ({ role, content, timestamp }) => {
@@ -11,7 +12,7 @@ export const MessageBubble = ({ role, content, timestamp }) => {
   return (
     <div className={`message-bubble ${isUser ? 'user' : 'bot'}`}>
       <div className="message-content">
-        {content}
+        <ChatMessage content={content} isUser={isUser} />
       </div>
       {timestamp && <span className="message-time">{timeAgo}</span>}
     </div>

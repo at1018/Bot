@@ -25,11 +25,12 @@
 
 .message-content {
   max-width: 70%;
-  padding: 12px 16px;
+  padding: 16px;
   border-radius: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   word-wrap: break-word;
   font-size: 14px;
+  overflow: hidden;
 }
 
 .message-bubble.user .message-content {
