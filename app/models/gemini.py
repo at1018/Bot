@@ -51,15 +51,22 @@ class GeminiProvider(BaseLLMProvider):
     def invoke(self, question: str, conversation_context: str = "", additional_context: str = "") -> str:
         """Invoke Gemini model."""
         try:
+            # Detect intent to know how to format response
+            intent = self._detect_intent(question)
+            
+            # Invoke the chain with dynamic system prompt
             response = self.chain.invoke({
                 "question": question,
                 "conversation_context": conversation_context,
                 "additional_context": additional_context,
             })
-            print("Raw Response from Gemini:", response.content)  # Debugging line
-            # Format response to ensure proper code formatting 
-            formatted= self._format_code_response(response.content)
-            print("Formatted Response:", formatted)  # Debugging line
+            
+            # Extract response content
+            response_text = response.content if hasattr(response, 'content') else str(response)
+            
+            # Format based on detected intent (lightweight formatting)
+            formatted = self._format_response(response_text, intent)
+            
             return formatted
         except Exception as e:
             logger.error(f"Error invoking Gemini: {str(e)}")

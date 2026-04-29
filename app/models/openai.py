@@ -52,13 +52,23 @@ class OpenAIProvider(BaseLLMProvider):
     def invoke(self, question: str, conversation_context: str = "", additional_context: str = "") -> str:
         """Invoke OpenAI model."""
         try:
+            # Detect intent to know how to format response
+            intent = self._detect_intent(question)
+            
+            # Invoke the chain with dynamic system prompt
             response = self.chain.invoke({
                 "question": question,
                 "conversation_context": conversation_context,
                 "additional_context": additional_context,
             })
-            # Format response to ensure proper code formatting
-            return self._format_code_response(response.content)
+            
+            # Extract response content
+            response_text = response.content if hasattr(response, 'content') else str(response)
+            
+            # Format based on detected intent (lightweight formatting)
+            formatted = self._format_response(response_text, intent)
+            
+            return formatted
         except Exception as e:
             logger.error(f"Error invoking OpenAI: {str(e)}")
             raise

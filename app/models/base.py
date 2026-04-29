@@ -37,125 +37,219 @@ class BaseLLMProvider(ABC):
         """Initialize the LLM client with provider-specific configuration."""
         pass
     
-    def _is_code_request(self, question: str) -> bool:
+    def _detect_intent(self, question: str) -> str:
         """
-        Detect if the user's question is asking for code.
+        Detect the intent of the user's question using the LLM.
         
-        Uses keyword-based detection for common code request patterns.
+        Uses the LLM to intelligently classify the question intent rather than keyword matching.
+        This enables accurate detection of nuanced queries like "what is python" (concept)
+        vs "write a python function" (code).
         
         Args:
             question: The user's question
             
         Returns:
-            True if the question appears to be requesting code, False otherwise
+            Intent classification: 'code', 'explanation', 'analysis', 'how-to', 'other'
         """
-        code_keywords = [
-            'python', 'javascript', 'java', 'code', 'function', 'script',
-            'program', 'write', 'create', 'build', 'implement', 'develop',
-            'sql', 'query', 'class', 'method', 'algorithm', 'application',
-            'api', 'endpoint', 'library', 'module', 'package', 'framework',
-            'example', 'demo', 'snippet', 'template', 'scaffold', 'generate',
-            'refactor', 'optimize', 'fix bug', 'debug', 'error handling',
-            'regex', 'database', 'server', 'client', 'middleware',
-            'html', 'css', 'react', 'angular', 'vue', 'node', 'express',
-            'django', 'flask', 'fastapi', 'spring', 'kotlin', 'go', 'rust'
-        ]
+        if not self.llm:
+            # Fallback if LLM not initialized
+            return 'other'
         
-        question_lower = question.lower()
+        intent_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an intent classifier. Analyze the user's question and classify it into ONE of these categories:
+
+- 'code': User explicitly wants code (write, implement, create, generate, fix, debug)
+- 'explanation': User wants conceptual explanation or understanding
+- 'analysis': User wants analysis, comparison, or breakdown
+- 'how-to': User wants step-by-step instructions or guidance
+- 'other': Doesn't fit above categories
+
+Respond with ONLY the category name, nothing else. No explanation."""),
+            ("human", f"Question: {question}")
+        ])
         
-        # Check if any code keyword is in the question
-        return any(keyword in question_lower for keyword in code_keywords)
+        try:
+            intent_chain = intent_prompt | self.llm
+            response = intent_chain.invoke({})
+            
+            # Extract intent from response
+            intent_text = response.content.strip().lower() if hasattr(response, 'content') else str(response).lower()
+            
+            # Validate and return valid intent
+            valid_intents = ['code', 'explanation', 'analysis', 'how-to', 'other']
+            for intent in valid_intents:
+                if intent in intent_text:
+                    return intent
+            
+            return 'other'
+        except Exception as e:
+            print(f"Warning: Intent detection failed, defaulting to 'other': {e}")
+            return 'other'
     
-    def _get_system_prompt(self, is_code: bool) -> str:
+    def _get_system_prompt(self, intent: str) -> str:
         """
-        Generate a dynamic system prompt based on query type.
+        Generate a natural, ChatGPT-like system prompt based on detected intent.
+        
+        Instead of forcing rigid templates, provides flexible guidance that lets
+        the LLM format responses naturally.
         
         Args:
-            is_code: If True, return strict code formatting prompt. Otherwise, structured text prompt.
+            intent: The detected intent ('code', 'explanation', 'analysis', 'how-to', 'other')
             
         Returns:
             The system prompt string
         """
-        if is_code:
+        if intent == 'code':
             return self._get_code_system_prompt()
+        elif intent == 'explanation':
+            return self._get_explanation_system_prompt()
+        elif intent == 'analysis':
+            return self._get_analysis_system_prompt()
+        elif intent == 'how-to':
+            return self._get_howto_system_prompt()
         else:
-            return self._get_text_system_prompt()
+            return self._get_default_system_prompt()
     
     def _get_code_system_prompt(self) -> str:
         """
-        Get system prompt for code requests.
-        
-        Enforces strict code formatting rules.
+        System prompt for code requests - natural and flexible.
         
         Returns:
             System prompt for code generation
         """
-        return """You are an expert code generation assistant.
+        return """You are a helpful coding assistant that writes clear, working code.
 
-## CODE RESPONSE REQUIREMENTS
+When responding to code requests:
+- Provide code in ```language code blocks (e.g. ```python, ```javascript)
+- Use proper indentation and formatting
+- Include comments for complex logic
+- Add a brief explanation ONLY if it helps understand the code
+- Include usage examples ONLY if they're necessary
+- Format naturally, don't force rigid structure
 
-**STRICT RULES - ALWAYS FOLLOW:**
+Write code that is:
+- Correct and working
+- Well-organized
+- Easy to understand
+- Production-ready where applicable
 
-1. **ALWAYS wrap code in triple backticks with language identifier**
-   Example: ```python, ```javascript, ```java, ```sql
-
-2. **INDENTATION MUST BE CORRECT**
-   - Python: 4 spaces per level
-   - JavaScript/Java: 2-4 spaces per level
-   - Preserve all formatting
-
-3. **CODE STRUCTURE**
-   - Clear variable names
-   - Comments for complex logic
-   - Error handling where applicable
-   - Logical organization
-
-4. **RESPONSE FORMAT**
-   - First: Complete code in triple backticks
-   - Then: ## Explanation section
-   - Then: ## How to Run section (if applicable)
-   - Include examples if helpful
-
-5. **NEVER RETURN PLAIN CODE** without backticks
-
-## EXTRACTION LEVEL: {extraction_level}
+Extraction level: {extraction_level}
 
 {conversation_context}
 
 {additional_context}"""
-    
-    def _get_text_system_prompt(self) -> str:
+
+    def _get_explanation_system_prompt(self) -> str:
         """
-        Get system prompt for non-code requests.
+        System prompt for concept/explanation requests - natural and conversational.
         
         Returns:
-            System prompt for structured text responses
+            System prompt for explanations
         """
-        return """You are a helpful, articulate assistant that provides clear, well-structured responses.
+        return """You are a helpful tutor that explains concepts clearly.
 
-## RESPONSE REQUIREMENTS
+When responding to explanation requests:
+- Provide clear, natural explanations
+- Use examples to illustrate concepts
+- Organize with headers only when helpful (not forced)
+- Use bullet points only when needed for clarity
+- Avoid unnecessary jargon
+- Format like a natural conversation, not a rigid template
 
-**FORMATTING RULES:**
+Write explanations that are:
+- Easy to understand
+- Well-structured but natural
+- Engaging and informative
+- Appropriate for the audience
 
-1. **Use Markdown Structure**
-   - Use headers (##, ###) to organize information
-   - Use bullet points for lists
-   - Use **bold** for important terms
-   - Use numbered lists for steps
+Extraction level: {extraction_level}
 
-2. **CLARITY AND ORGANIZATION**
-   - Start with direct answer
-   - Support with details
-   - Use examples when helpful
-   - Keep text readable and concise
+{conversation_context}
 
-3. **AVOID**
-   - Unnecessary code blocks in text responses
-   - Long paragraphs without structure
-   - Overly verbose explanations
-   - Redundant repetition
+{additional_context}"""
 
-## EXTRACTION LEVEL: {extraction_level}
+    def _get_analysis_system_prompt(self) -> str:
+        """
+        System prompt for analysis requests - comparative and detailed.
+        
+        Returns:
+            System prompt for analysis
+        """
+        return """You are an analytical assistant that breaks down topics thoroughly.
+
+When responding to analysis requests:
+- Provide thorough, balanced analysis
+- Compare different perspectives when relevant
+- Use structured sections only if helpful
+- Support claims with reasoning
+- Format clearly but naturally
+- Avoid over-formatting
+
+Provide analysis that is:
+- Comprehensive and balanced
+- Well-reasoned
+- Clearly structured
+- Practical and actionable
+
+Extraction level: {extraction_level}
+
+{conversation_context}
+
+{additional_context}"""
+
+    def _get_howto_system_prompt(self) -> str:
+        """
+        System prompt for how-to/guide requests - step-by-step but natural.
+        
+        Returns:
+            System prompt for how-to guides
+        """
+        return """You are a helpful guide writer that provides clear instructions.
+
+When responding to how-to requests:
+- Use numbered steps for procedures
+- Include necessary code examples in ```language blocks
+- Explain why each step matters
+- Provide warnings or tips when helpful
+- Format steps clearly but naturally
+- Skip unnecessary decoration
+
+Provide guides that are:
+- Easy to follow
+- Complete without being verbose
+- Well-paced and clear
+- Practical and actionable
+
+Extraction level: {extraction_level}
+
+{conversation_context}
+
+{additional_context}"""
+
+    def _get_default_system_prompt(self) -> str:
+        """
+        Default system prompt - natural and conversational.
+        
+        Returns:
+            System prompt for general questions
+        """
+        return """You are a helpful, knowledgeable assistant.
+
+When responding:
+- Be clear and natural
+- Use markdown formatting when appropriate
+- Organize information logically
+- Use headers, lists, and emphasis only when helpful
+- Avoid unnecessary structure
+- Format like a natural conversation
+
+Write responses that are:
+- Clear and concise
+- Well-organized
+- Helpful and relevant
+- Easy to read
+
+Extraction level: {extraction_level}
 
 {conversation_context}
 
@@ -163,25 +257,25 @@ class BaseLLMProvider(ABC):
     
     def setup_chain(self):
         """
-        Setup the LangChain chain with dynamic system prompts.
+        Setup the LangChain chain with intent-based system prompts.
         
-        Uses RunnableLambda to determine system prompt at runtime based on query type.
+        Uses RunnableLambda to detect intent and select appropriate system prompt at runtime.
         """
         prompt_template = ChatPromptTemplate.from_messages([
             ("system", "{system_prompt}"),
             ("human", "{question}")
         ])
         
-        # Chain with dynamic system prompt injection
+        # Chain with dynamic system prompt injection based on detected intent
         self.chain = (
             {
                 "question": RunnablePassthrough(),
                 "conversation_context": RunnablePassthrough(),
                 "additional_context": RunnablePassthrough(),
                 "extraction_level": RunnableLambda(lambda _: self._format_extraction_level()),
-                # Key: Dynamically determine system prompt based on question
+                # Dynamically detect intent and select appropriate system prompt
                 "system_prompt": RunnableLambda(lambda x: self._get_system_prompt(
-                    self._is_code_request(x.get("question", ""))
+                    self._detect_intent(x.get("question", ""))
                 )),
             }
             | prompt_template
@@ -223,28 +317,105 @@ class BaseLLMProvider(ABC):
         """Get the current extraction level."""
         return self.extraction_level
     
-    def _format_code_response(self, text: str) -> str:
+    def _format_response(self, text: str, intent: str) -> str:
         """
-        CRITICAL: Post-process response to ensure proper code block formatting with enforcement.
+        Format response based on detected intent.
         
-        This is the primary enforcement gate for code responses. It implements a 2-PASS SYSTEM:
-        1. PASS 1 → Python parsing, validation, repair (Phase 3 logic)
-        2. PASS 2 → LLM reformatting for final polish (2-pass system)
+        This is lightweight formatting that respects the LLM's natural output
+        while ensuring code blocks are properly formatted when present.
         
         Args:
             text: The raw response from the model
+            intent: The detected intent
             
         Returns:
-            Properly formatted code response with guaranteed structure
+            Properly formatted response
         """
-        # PASS 1: Apply the critical Python enforcement layer (Phase 3)
-        enforced_text = self._enforce_response_structure(text, is_code=True)
-        enforced_text = self._ensure_code_format(enforced_text)
+        if not text or not text.strip():
+            return text
         
-        # PASS 2: Use LLM to reformat for final polish (2-pass system)
-        final_text = self._reformat_response(enforced_text, is_code=True)
+        # For code intent, ensure code blocks have proper formatting
+        if intent == 'code':
+            text = self._ensure_code_blocks(text)
         
-        return final_text
+        # General cleanup - remove any accidentally double-wrapped code blocks
+        text = self._clean_code_blocks(text)
+        
+        return text
+    
+    def _ensure_code_blocks(self, text: str) -> str:
+        """
+        Ensure code blocks in responses have proper language identifiers.
+        
+        Fixes common issues like:
+        - ``` without language identifier
+        - Incorrectly formatted code blocks
+        
+        Args:
+            text: Response text that may contain code blocks
+            
+        Returns:
+            Response with properly formatted code blocks
+        """
+        # Find all code blocks
+        lines = text.split('\n')
+        result = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # Look for opening code fence
+            if line.strip().startswith('```'):
+                fence = line.strip()
+                language = fence[3:].strip()
+                
+                # If no language specified, try to detect it
+                if not language:
+                    # Look ahead for language indicators
+                    code_lines = []
+                    j = i + 1
+                    while j < len(lines) and not lines[j].strip().startswith('```'):
+                        code_lines.append(lines[j])
+                        j += 1
+                    
+                    language = self._detect_language(code_lines) if code_lines else 'plaintext'
+                
+                result.append(f"```{language}")
+                i += 1
+                
+                # Copy code content until closing fence
+                while i < len(lines) and not lines[i].strip().startswith('```'):
+                    result.append(lines[i])
+                    i += 1
+                
+                # Add closing fence
+                if i < len(lines):
+                    result.append(lines[i])
+                    i += 1
+            else:
+                result.append(line)
+                i += 1
+        
+        return '\n'.join(result)
+    
+    def _clean_code_blocks(self, text: str) -> str:
+        """
+        Clean up code formatting issues.
+        
+        Args:
+            text: Response text
+            
+        Returns:
+            Cleaned response
+        """
+        # Remove double code fence markers (``` followed immediately by ```)
+        text = re.sub(r'```\s*```', '```', text)
+        
+        # Remove excessive blank lines (more than 2 consecutive)
+        text = re.sub(r'\n\n\n+', '\n\n', text)
+        
+        return text
     
     def _detect_language(self, lines: list) -> str:
         """
@@ -362,92 +533,6 @@ class BaseLLMProvider(ABC):
         result['has_structure'] = has_headers or has_lists
         
         return result
-    
-    def _validate_response_structure(self, text: str, is_code: bool) -> tuple[bool, str]:
-        """
-        Validate that response matches expected structure.
-        
-        CRITICAL VALIDATION: Ensures output matches intent.
-        
-        Args:
-            text: The response text
-            is_code: Whether this should be a code response
-            
-        Returns:
-            tuple of (is_valid, error_message)
-        """
-        if not text or not text.strip():
-            return False, "Response is empty"
-        
-        if is_code:
-            # Code response MUST have triple backticks
-            if '```' not in text:
-                return False, "Code response missing triple backticks"
-            
-            # Extract code
-            code_match = re.search(r'```(\w*)\n(.*?)\n```', text, re.DOTALL)
-            if not code_match:
-                return False, "Invalid code block format"
-            
-            language, code = code_match.groups()
-            
-            # Validate code is not empty
-            if not code.strip():
-                return False, "Code block is empty"
-            
-            # Code should be reasonably sized (not just one line)
-            code_lines = code.strip().split('\n')
-            if len(code_lines) < 1:
-                return False, "Code too short"
-            
-            return True, ""
-        else:
-            # Text response should have some structure or content
-            if len(text.strip()) < 10:
-                return False, "Response too short"
-            
-            # Should have either headers, lists, or be reasonably formatted
-            has_headers = '##' in text or '###' in text
-            has_lists = re.search(r'^\s*[-*]\s', text, re.MULTILINE)
-            has_numbered = re.search(r'^\s*\d+\.\s', text, re.MULTILINE)
-            
-            # At least some structure is preferred but not mandatory for short responses
-            if len(text) > 100:
-                if not (has_headers or has_lists or has_numbered):
-                    return False, "Long response lacks structure"
-            
-            return True, ""
-    
-    def _enforce_response_structure(self, text: str, is_code: bool) -> str:
-        """
-        CRITICAL: Enforce deterministic response structure.
-        
-        This is the final gatekeeper to ensure output matches expected structure.
-        If validation fails, attempts to repair the response.
-        
-        Args:
-            text: The raw response from the model
-            is_code: Whether this should be a code response
-            
-        Returns:
-            Properly formatted response guaranteed to match structure
-        """
-        is_valid, error_msg = self._validate_response_structure(text, is_code)
-        
-        if is_valid:
-            # Validation passed - ensure formatting is correct
-            if is_code:
-                return self._ensure_code_format(text)
-            else:
-                return self._ensure_text_format(text)
-        else:
-            # Validation failed - attempt repair
-            if is_code:
-                return self._repair_code_response(text)
-            else:
-                return self._repair_text_response(text)
-    
-    def _repair_code_response(self, text: str) -> str:
         """
         Repair a code response that fails validation.
         
